@@ -1,6 +1,47 @@
 ListOfCharacters = {ProjectLib.loadDatabase file 'database.txt'}
 
 declare
+Database = [
+character('Harry Potter'
+'Est-ce que c\'est une fille ?':false
+'A-t-il des cheveux noirs ?':true
+'Porte-t-il des lunettes ?':true
+'A-t-il des cheveux roux ?':false
+)
+character('Ron Weasley'
+'Est-ce que c\'est une fille ?':false
+'A-t-il des cheveux noirs ?':false
+'Porte-t-il des lunettes ?':false
+'A-t-il des cheveux roux ?':true
+)
+character('Hermione Granger'
+'Est-ce que c\'est une fille ?':true
+'A-t-il des cheveux noirs ?':false
+'Porte-t-il des lunettes ?':false
+'A-t-il des cheveux roux ?':false
+)
+character('Ginny Weasley'
+'Est-ce que c\'est une fille ?':true
+'A-t-il des cheveux noirs ?':false
+'Porte-t-il des lunettes ?':false
+'A-t-il des cheveux roux ?':true
+)
+character('Minerva McGonagall'
+'Est-ce que c\'est une fille ?':true
+'A-t-il des cheveux noirs ?':false
+'Porte-t-il des lunettes ?':true
+'A-t-il des cheveux roux ?':false
+)
+character('Severus Rogue'
+'Est-ce que c\'est une fille ?':false
+'A-t-il des cheveux noirs ?':true
+'Porte-t-il des lunettes ?':false
+'A-t-il des cheveux roux ?':false
+)
+]
+
+
+declare
 fun {GetRecord ArityCharacter Record}
   case ArityCharacter
   of nil then Record
@@ -137,4 +178,6 @@ fun {TreeBuilder Database}
   end
 end
 
-{Browse {TreeBuilder ListOfCharacters}}
+declare
+Tree = {TreeBuilder Database}
+{Browse Tree}
