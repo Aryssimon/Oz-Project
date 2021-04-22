@@ -1,111 +1,140 @@
 ListOfCharacters = {ProjectLib.loadDatabase file 'database.txt'}
 
-
 declare
-fun {GetRecord Character}
-  local Record in
-    for V in {Arity Character} do
-      if Character.V == true then
-        {AdjoinAt Record Character.V 0} % Add the question to the record and set the value to 0
-      elseif Character.V == false then
-        {AdjoinAt Record Character.V 0} % Do the same when false (this avoid the name of the character)
-      end
-    end
-    Record
+fun {GetRecord ArityCharacter Record}
+  case ArityCharacter
+  of nil then Record
+  [] H|T then
+    % Add the question to the record and set the value to 0
+    {GetRecord T {AdjoinAt Record H 0}}
   end
 end
 
 
 declare
 fun {FeedRecord R Database}
-  for Character in Database do
-    for V in {Arity Character} do
-      if Character.V == true then
-        {AdjoinAt R Character.V (R.Character.V + 1)} % Add 1 to the value of the record if true
-      elseif Character.V == false then
-        {AdjoinAt R Character.V (R.Character.V - 1)} % Sub 1 to the value of the record if false
-      end
-    end
-  end
-  R
-end
-
-declare
-fun {GetMinQuestion R}
-  local MinValue MinQuestion in
-    MinValue = Max
-    for V in {Arity R} do
-      if {Abs R.V} < MinValue then
-        MinValue = {Abs R.V}
-        MinQuestion = R.V
-      end
-    end
-    MinQuestion
-  end
-end
-
-
-declare
-fun {GetTrueResponders Database Question}
-  local L in
-    L = []
-    for Character in Database do
-      if Character.Question == true then
-        Character = {Subtract Character Question}
-        L = {Append L Character}
-      end
-    end
-    L
-  end
-end
-
-
-declare
-fun {GetFalseResponders Database Question}
-  local L in
-    L = []
-    for Character in Database do
-      if Character.Question == false then
-        Character = {Subtract Character Question}
-        L = {Append L Character}
-      end
-    end
-    L
-  end
-end
-
-
-declare
-fun {HaveSameAnswers Responders}
-  for Question in {Arity Responders.1} do
-    local V in
-      V = Responders.1.Question
-      for Character in Responders do
-        if Character.Question == Not V then
-          false
+  local CountTrueFalse in
+    fun {CountTrueFalse Character ArityCharacter Record}
+      case ArityCharacter
+      of nil then Record
+      [] H|T then
+        if Character.H == true then
+          % Add 1 to the value of the record if true
+          {CountTrueFalse Character T {AdjoinAt Record H (Record.H + 1)}}
+        elseif Character.H == false then
+          % Sub 1 to the value of the record if false
+          {CountTrueFalse Character T {AdjoinAt Record H (Record.H - 1)}}
         end
       end
     end
+    case Database
+    of nil then R
+    [] H|T then
+      {FeedRecord {CountTrueFalse H {Arity H}.2 R} T}
+    end
   end
-  true
 end
+
+
+declare
+fun {GetMinQuestion R}
+  local RecFinder A in
+    fun {RecFinder R ArityR MinValue MinQuestion}
+      case ArityR
+      of nil then MinQuestion
+      [] H|T then
+        if {Abs R.H} < MinValue then
+          {RecFinder R T {Abs R.H} H}
+        else
+          {RecFinder R T MinValue MinQuestion}
+        end
+      end
+    end
+    A = {Arity R}
+    {RecFinder R A {Abs R.(A.1)} A.1}
+  end
+end
+
+
+declare
+fun {GetTrueResponders L Database Question}
+  case Database
+  of nil then L
+  [] H|T then
+    if H.Question == true then
+      {GetTrueResponders {Append L [{Record.subtract H Question}]} T Question}
+    else
+      {GetTrueResponders L T Question}
+    end
+  end
+end
+
+
+declare
+fun {GetFalseResponders L Database Question}
+  case Database
+  of nil then L
+  [] H|T then
+    if H.Question == false then
+      {GetFalseResponders {Append L [{Record.subtract H Question}]} T Question}
+    else
+      {GetFalseResponders L T Question}
+    end
+  end
+end
+
+
+declare
+fun {HaveSameAnswers Responders Questions}
+  local CheckOneQuestion in
+    fun {CheckOneQuestion Responders First Question}
+      case Responders
+      of nil then true
+      [] H|T then
+        if H.Question \= First.Question then
+          false
+        else
+          {CheckOneQuestion T First Question}
+        end
+      end
+    end
+    case Questions
+    of nil then true
+    [] H|T then
+      if {CheckOneQuestion Responders Responders.1 H} == false then
+        false
+      else
+        {HaveSameAnswers Responders T}
+      end
+    end
+  end
+end
+
+
+declare
+fun {GetOnlyNames Database Names}
+  case Database
+  of nil then Names
+  [] H|T then {GetOnlyNames T H.1|Names}
+  end
+end
+
 
 declare
 fun {TreeBuilder Database}
-  if {Width Database == 1} orelse {HaveSameAnswers Database} then
-    leaf(Database)
+  if {Length Database} == 1 orelse {HaveSameAnswers Database {Arity Database.1}.2} then
+    leaf({GetOnlyNames Database nil})
   else
-    local R Q in
-      R = {GetRecord Database.1} % Create the record with question as key and 0 as value
-      R = {FeedRecord R Database} % Get and store the Difference True-False for each question in the record
+    local R Q EmptyR TrueResponders FalseResponders in
+      EmptyR = {GetRecord {Arity Database.1}.2 '|'()} % Create the record with question as key and 0 as value
+      R = {FeedRecord EmptyR Database} % Get and store the Difference True-False for each question in the record
       Q = {GetMinQuestion R} % Get the question with the lowest (true-false) ratio
-      TrueResponders = {GetTrueResponders Database Q}
-      FalseResponders = {GetFalseResponders Database Q}
+      TrueResponders = {GetTrueResponders nil Database Q}
+      FalseResponders = {GetFalseResponders nil Database Q}
 
       question(Q true:{TreeBuilder TrueResponders} false:{TreeBuilder FalseResponders})
     end
   end
 end
-
 
 {Browse {TreeBuilder ListOfCharacters}}
