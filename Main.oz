@@ -5,29 +5,54 @@ import
    OS
    System
    Application
+   Open
 define
    CWD = {Atom.toString {OS.getCWD}}#"/"
    Browse = proc {$ Buf} {Browser.browse Buf} end
    Print = proc{$ S} {System.print S} end
    Args = {Application.getArgs record('nogui'(single type:bool default:false optional:true)
-									  'db'(single type:string default:CWD#"database.txt"))}
+									  'db'(single type:string default:CWD#"database.txt")
+                    'ans'(single type:string default:CWD#"test_answers.txt"))}
 in
    local
-	   NoGUI = Args.'nogui'
-	   DB = Args.'db'
+	    NoGUI = Args.'nogui'
+	    DB = Args.'db'
       ListOfCharacters = {ProjectLib.loadDatabase file Args.'db'}
       %NewCharacter = {ProjectLib.loadCharacter file CWD#"new_character.txt"}
-	   % Vous devez modifier le code pour que cette variable soit
-	   % assigné un argument
-      ListOfAnswersFile = CWD#"test_answers.txt"
-      ListOfAnswers = {ProjectLib.loadCharacter file CWD#"test_answers.txt"}
 
-      fun {GetRecord ArityCharacter Record}
-         case ArityCharacter
-         of nil then Record
-         [] H|T then
-         % Add the question to the record and set the value to 0
-            {GetRecord T {AdjoinAt Record H 0}}
+      ListOfAnswersFile = Args.'ans'
+      ListOfAnswers = {ProjectLib.loadCharacter file ListOfAnswersFile}
+
+      OutputFile = {New Open.file init(name: stdout
+          flags: [write create truncate text])}
+
+      proc {WriteListToFile L F}
+      % F must be an opened file
+         case L
+         of H|nil then
+            {F write(vs:H)}
+         []H|T then
+            {F write(vs:H#",")}
+            {WriteListToFile T F}
+         end
+      end
+
+      fun {GetRecord Database Record}
+         local BrowseQuestions in
+            fun {BrowseQuestions ArityCharacter Record}
+               case ArityCharacter
+               of nil then Record
+               [] H|T then
+                  % Add the question to the record and set the value to 0
+                  {BrowseQuestions T {AdjoinAt Record H 0}}
+               end
+            end
+            case Database
+            of nil then Record
+            [] H|T then
+               % Call BrowseQuestions with each character
+               {GetRecord T {BrowseQuestions {Arity H}.2 Record}}
+            end
          end
       end
 
@@ -76,7 +101,7 @@ in
          case Database
          of nil then L
          [] H|T then
-            if H.Question == true then
+            if {HasFeature H Question} == false orelse H.Question == true then
                {GetTrueResponders {Append L [{Record.subtract H Question}]} T Question}
             else
                {GetTrueResponders L T Question}
@@ -88,7 +113,7 @@ in
          case Database
          of nil then L
          [] H|T then
-            if H.Question == false then
+            if {HasFeature H Question} == false orelse H.Question == false then
                {GetFalseResponders {Append L [{Record.subtract H Question}]} T Question}
             else
                {GetFalseResponders L T Question}
@@ -98,21 +123,27 @@ in
 
       fun {HaveSameAnswers Responders Questions}
          local CheckOneQuestion in
-            fun {CheckOneQuestion Responders First Question}
+            fun {CheckOneQuestion Responders Question Value}
                case Responders
                of nil then true
                [] H|T then
-                  if H.Question \= First.Question then
-                     false
+                  if {HasFeature H Question} then
+                     if Value == 'wait' then
+                        {CheckOneQuestion T Question H.Question} % Set value
+                     elseif H.Question \= Value then
+                        false
+                     else
+                        {CheckOneQuestion T Question Value}
+                     end
                   else
-                     {CheckOneQuestion T First Question}
+                     {CheckOneQuestion T Question Value}
                   end
                end
             end
             case Questions
             of nil then true
             [] H|T then
-               if {CheckOneQuestion Responders Responders.1 H} == false then
+               if {CheckOneQuestion Responders H 'wait'} == false then
                   false
                else
                   {HaveSameAnswers Responders T}
@@ -129,17 +160,17 @@ in
       end
 
       fun {TreeBuilder Database}
-         if {Length Database} == 1 orelse {HaveSameAnswers Database {Arity Database.1}.2} then
-            leaf({GetOnlyNames Database nil})
-         else
-            local R Q EmptyR TrueResponders FalseResponders in
-               EmptyR = {GetRecord {Arity Database.1}.2 '|'()} % Create the record with question as key and 0 as value
+         local R Q EmptyR TrueResponders FalseResponders in
+            EmptyR = {GetRecord Database '|'()} % Create the record with question as key and 0 as value
+            if {Length Database} == 1 orelse {HaveSameAnswers Database {Arity EmptyR}} then
+               leaf({GetOnlyNames Database nil})
+            else
                R = {FeedRecord EmptyR Database} % Get and store the Difference True-False for each question in the record
                Q = {GetMinQuestion R} % Get the question with the lowest (true-false) ratio
                TrueResponders = {GetTrueResponders nil Database Q}
                FalseResponders = {GetFalseResponders nil Database Q}
 
-               question(Q true:{TreeBuilder TrueResponders} false:{TreeBuilder FalseResponders})
+               question(Q true:{TreeBuilder TrueResponders} false:{TreeBuilder FalseResponders} )
             end
          end
       end
@@ -153,7 +184,7 @@ in
                   {Print 'Je me suis trompé\n'}
                   {Print {ProjectLib.surrender}}
                else
-                  {Print Result}
+                  {WriteListToFile Result OutputFile}
                end
                unit
             end
@@ -169,6 +200,7 @@ in
     {ProjectLib.play opts(characters:ListOfCharacters driver:GameDriver
                             noGUI:NoGUI builder:TreeBuilder
                             autoPlay:ListOfAnswers)}
+    {OutputFile close}
     {Application.exit 0}
    end
 end
