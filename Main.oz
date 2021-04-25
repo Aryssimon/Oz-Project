@@ -159,8 +159,15 @@ in
          end
       end
 
+      fun {RemoveQuestion Database Q Result}
+         case Database
+         of nil then Result
+         [] H|T then {RemoveQuestion T Q {Record.subtract H Q}}
+         end
+      end
+
       fun {TreeBuilder Database}
-         local R Q EmptyR TrueResponders FalseResponders in
+         local R Q EmptyR TrueResponders FalseResponders UnknownDatabase in
             EmptyR = {GetRecord Database '|'()} % Create the record with question as key and 0 as value
             if {Length Database} == 1 orelse {HaveSameAnswers Database {Arity EmptyR}} then
                leaf({GetOnlyNames Database nil})
@@ -169,8 +176,10 @@ in
                Q = {GetMinQuestion R} % Get the question with the lowest (true-false) ratio
                TrueResponders = {GetTrueResponders nil Database Q}
                FalseResponders = {GetFalseResponders nil Database Q}
+               UnknownDatabase = {RemoveQuestion Database Q Database}
 
-               question(Q true:{TreeBuilder TrueResponders} false:{TreeBuilder FalseResponders} )
+
+               question(Q true:{TreeBuilder TrueResponders} false:{TreeBuilder FalseResponders} 'unknown':{TreeBuilder UnknownDatabase})
             end
          end
       end
@@ -188,8 +197,8 @@ in
                end
                unit
             end
-         [] question(1:Q false:T1 true:T2) then
-            if {ProjectLib.askQuestion Q} then
+         [] question(1:Q false:T1 true:T2 'unknown':T3) then
+            if {ProjectLib.askQuestion Q} == true then
                {GameDriver T2}
             else
                {GameDriver T1}
@@ -199,7 +208,8 @@ in
    in
     {ProjectLib.play opts(characters:ListOfCharacters driver:GameDriver
                             noGUI:NoGUI builder:TreeBuilder
-                            autoPlay:ListOfAnswers)}
+                            autoPlay:ListOfAnswers
+                            allowUnknown:true)}
     {OutputFile close}
     {Application.exit 0}
    end
