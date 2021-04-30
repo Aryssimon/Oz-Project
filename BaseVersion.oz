@@ -15,12 +15,10 @@ define
                     'ans'(single type:string default:CWD#"test_answers.txt"))}
 in
    local
-	    NoGUI = Args.'nogui'
-	    DB = Args.'db'
+	   NoGUI = Args.'nogui'
+	   DB = Args.'db'
       ListOfCharacters = {ProjectLib.loadDatabase file Args.'db'}
-      %NewCharacter = {ProjectLib.loadCharacter file CWD#"new_character.txt"}
-
-      ListOfAnswersFile = Args.'ans'
+      ListOfAnswersFile = ListOfAnswersFile = Args.'ans'
       ListOfAnswers = {ProjectLib.loadCharacter file ListOfAnswersFile}
 
       OutputFile = {New Open.file init(name: stdout
@@ -37,22 +35,12 @@ in
          end
       end
 
-      fun {GetRecord Database Record}
-         local BrowseQuestions in
-            fun {BrowseQuestions ArityCharacter Record}
-               case ArityCharacter
-               of nil then Record
-               [] H|T then
-                  % Add the question to the record and set the value to 0
-                  {BrowseQuestions T {AdjoinAt Record H 0}}
-               end
-            end
-            case Database
-            of nil then Record
-            [] H|T then
-               % Call BrowseQuestions with each character
-               {GetRecord T {BrowseQuestions {Arity H}.2 Record}}
-            end
+      fun {GetRecord ArityCharacter Record}
+         case ArityCharacter
+         of nil then Record
+         [] H|T then
+         % Add the question to the record and set the value to 0
+            {GetRecord T {AdjoinAt Record H 0}}
          end
       end
 
@@ -101,7 +89,7 @@ in
          case Database
          of nil then L
          [] H|T then
-            if {HasFeature H Question} == false orelse H.Question == true then
+            if H.Question == true then
                {GetTrueResponders {Append L [{Record.subtract H Question}]} T Question}
             else
                {GetTrueResponders L T Question}
@@ -113,7 +101,7 @@ in
          case Database
          of nil then L
          [] H|T then
-            if {HasFeature H Question} == false orelse H.Question == false then
+            if H.Question == false then
                {GetFalseResponders {Append L [{Record.subtract H Question}]} T Question}
             else
                {GetFalseResponders L T Question}
@@ -123,27 +111,21 @@ in
 
       fun {HaveSameAnswers Responders Questions}
          local CheckOneQuestion in
-            fun {CheckOneQuestion Responders Question Value}
+            fun {CheckOneQuestion Responders First Question}
                case Responders
                of nil then true
                [] H|T then
-                  if {HasFeature H Question} then
-                     if Value == 'wait' then
-                        {CheckOneQuestion T Question H.Question} % Set value
-                     elseif H.Question \= Value then
-                        false
-                     else
-                        {CheckOneQuestion T Question Value}
-                     end
+                  if H.Question \= First.Question then
+                     false
                   else
-                     {CheckOneQuestion T Question Value}
+                     {CheckOneQuestion T First Question}
                   end
                end
             end
             case Questions
             of nil then true
             [] H|T then
-               if {CheckOneQuestion Responders H 'wait'} == false then
+               if {CheckOneQuestion Responders Responders.1 H} == false then
                   false
                else
                   {HaveSameAnswers Responders T}
@@ -159,27 +141,18 @@ in
          end
       end
 
-      fun {RemoveQuestion Database Q Result}
-         case Database
-         of nil then Result
-         [] H|T then {RemoveQuestion T Q {Record.subtract H Q}}
-         end
-      end
-
       fun {TreeBuilder Database}
-         local R Q EmptyR TrueResponders FalseResponders UnknownDatabase in
-            EmptyR = {GetRecord Database '|'()} % Create the record with question as key and 0 as value
-            if {Length Database} == 1 orelse {HaveSameAnswers Database {Arity EmptyR}} then
-               leaf({GetOnlyNames Database nil})
-            else
+         if {Length Database} == 1 orelse {HaveSameAnswers Database {Arity Database.1}.2} then
+            leaf({GetOnlyNames Database nil})
+         else
+            local R Q EmptyR TrueResponders FalseResponders in
+               EmptyR = {GetRecord {Arity Database.1}.2 '|'()} % Create the record with question as key and 0 as value
                R = {FeedRecord EmptyR Database} % Get and store the Difference True-False for each question in the record
                Q = {GetMinQuestion R} % Get the question with the lowest (true-false) ratio
                TrueResponders = {GetTrueResponders nil Database Q}
                FalseResponders = {GetFalseResponders nil Database Q}
-               UnknownDatabase = {RemoveQuestion Database Q Database}
 
-
-               question(Q true:{TreeBuilder TrueResponders} false:{TreeBuilder FalseResponders} 'unknown':{TreeBuilder UnknownDatabase})
+               question(Q true:{TreeBuilder TrueResponders} false:{TreeBuilder FalseResponders})
             end
          end
       end
@@ -197,8 +170,8 @@ in
                end
                unit
             end
-         [] question(1:Q false:T1 true:T2 'unknown':T3) then
-            if {ProjectLib.askQuestion Q} == true then
+         [] question(1:Q false:T1 true:T2) then
+            if {ProjectLib.askQuestion Q} then
                {GameDriver T2}
             else
                {GameDriver T1}
@@ -208,8 +181,8 @@ in
    in
     {ProjectLib.play opts(characters:ListOfCharacters driver:GameDriver
                             noGUI:NoGUI builder:TreeBuilder
-                            autoPlay:ListOfAnswers
-                            allowUnknown:true)}
+                            autoPlay:ListOfAnswers)}
+
     {OutputFile close}
     {Application.exit 0}
    end
