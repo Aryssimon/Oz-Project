@@ -26,6 +26,10 @@ in
       OutputFile = {New Open.file init(name: stdout
           flags: [write create truncate text])}
 
+
+      /**
+       * Recursively write the result (L) to the OutputFile (F).
+       */
       proc {WriteListToFile L F}
       % F must be an opened file
          case L
@@ -37,16 +41,22 @@ in
          end
       end
 
+      /**
+       * Add each question as keys in the record with a counter set to 0.
+       * e.g. : Record(Q1:0 Q2:0 ...).
+       */
       fun {GetRecord Database Record}
          local BrowseQuestions in
-            fun {BrowseQuestions ArityCharacter Record}
-               case ArityCharacter
+            fun {BrowseQuestions CharacterQuestions Record}
+               % Loop over each Question for a character
+               case CharacterQuestions
                of nil then Record
                [] H|T then
-                  % Add the question to the record and set the value to 0
+                  % Add the question to the record and set the value to 0 if not in the Record already
                   {BrowseQuestions T {AdjoinAt Record H 0}}
                end
             end
+            % Loop over each character in Database
             case Database
             of nil then Record
             [] H|T then
@@ -60,10 +70,19 @@ in
          end
       end
 
+
+      /**
+       * Visits each character, and loop over each question,
+       * if the answer is True then add 1 in the record where the question is the key,
+       * if the answer is False then subtract 1.
+       *
+       * Returns a record with the questions as keys and a number (trues - falses) as value.
+       */
       fun {FeedRecord R Database}
          local CountTrueFalse in
-            fun {CountTrueFalse Character ArityCharacter Record}
-               case ArityCharacter
+            fun {CountTrueFalse Character CharacterQuestions Record}
+               % Loop over each Question for a character
+               case CharacterQuestions
                of nil then Record
                [] H|T then
                   if Character.H == true then
@@ -88,8 +107,14 @@ in
          end
       end
 
+
+      /**
+       * Return the question in record "Record" with minimum abs(true-false).
+       * e.g. : Record(Q1:-1 Q2:-2 Q3:2) will return Q1.
+       */
       fun {GetMinQuestion R}
          local RecFinder A in
+            %function to get the question with minimum abs(value).
             fun {RecFinder R ArityR MinValue MinQuestion}
                case ArityR
                of nil then MinQuestion
@@ -106,11 +131,14 @@ in
          end
       end
 
+      /**
+       * Returns the list of characters whose answer is True for the question in parameters.
+       */
       fun {GetTrueResponders L Database Question}
          case Database
          of nil then L
          [] H|T then
-            if {HasFeature H Question} == false orelse H.Question == true then
+            if {HasFeature H Question} == false orelse H.Question == true then  % If the character doesn't have the question, consider his answer true
                {GetTrueResponders {Append L [{Record.subtract H Question}]} T Question}
             else
                {GetTrueResponders L T Question}
@@ -118,11 +146,15 @@ in
          end
       end
 
+
+      /**
+       * Returns the list of characters whose answer is False for the question in parameters.
+       */
       fun {GetFalseResponders L Database Question}
          case Database
          of nil then L
          [] H|T then
-            if {HasFeature H Question} == false orelse H.Question == false then
+            if {HasFeature H Question} == false orelse H.Question == false then % If the character doesn't have the question, consider his answer false
                {GetFalseResponders {Append L [{Record.subtract H Question}]} T Question}
             else
                {GetFalseResponders L T Question}
@@ -130,6 +162,11 @@ in
          end
       end
 
+
+      /**
+       * Function used when the player answers 'unknown', we then keep all characters and remove the Question.
+       * Return a list L with all the characters from Database without Question.
+       */
       fun {GetUnknownResponders L Database Question}
          case Database
          of nil then L
@@ -138,6 +175,14 @@ in
          end
       end
 
+      /**
+       * For each question, each character must have the same answers or not having
+       * answer to this question for the function to continue.
+       *
+       *  - If an answer is different from a character to another then returns False.
+       *  - If all questions have been asked and no difference in the answers have
+       * been found then returns True.
+       */
       fun {HaveSameAnswers Responders Questions}
          local CheckOneQuestion in
             fun {CheckOneQuestion Responders Question Value}
@@ -160,6 +205,8 @@ in
             case Questions
             of nil then true
             [] H|T then
+               % wait is a temporary value that'll be replaced by the answer of
+               % the first character having this question.
                if {CheckOneQuestion Responders H 'wait'} == false then
                   false
                else
@@ -169,6 +216,9 @@ in
          end
       end
 
+      /**
+       * Return Names : a list of the character's names in Database.
+       */
       fun {GetOnlyNames Database Names}
          case Database
          of nil then Names
@@ -176,6 +226,9 @@ in
          end
       end
 
+      /**
+       * Recursively build a Tree from the Database.
+       */
       fun {TreeBuilder Database}
          local R Q EmptyR TrueResponders FalseResponders UnknownResponders in
             EmptyR = {GetRecord Database '|'()} % Create the record with question as key and 0 as value
@@ -184,8 +237,9 @@ in
             else
                R = {FeedRecord EmptyR Database} % Get and store the Difference True-False for each question in the record
                Q = {GetMinQuestion R} % Get the question with the lowest (true-false) ratio
-               TrueResponders = {GetTrueResponders nil Database Q}
-               FalseResponders = {GetFalseResponders nil Database Q}
+               TrueResponders = {GetTrueResponders nil Database Q} % Get characters whose answer to the question is True.
+               FalseResponders = {GetFalseResponders nil Database Q} % Get characters whose answer to the question is False.
+               % Get all characters and remove question Q. (Useful when player chooses unknown when answering to this question)
                UnknownResponders = {GetUnknownResponders nil Database Q}
 
 
@@ -194,8 +248,12 @@ in
          end
       end
 
+      /**
+       * Recursively ask the questions from the decision tree to the player based on his answers.
+       */
       fun {GameDriver Tree}
          case Tree
+         % End of Tree
          of leaf(Result) then
             local Res in
                Res = {ProjectLib.found Result}
@@ -203,10 +261,11 @@ in
                   {Print 'Je me suis trompé\n'}
                   {Print {ProjectLib.surrender}}
                else
-                  {WriteListToFile Result OutputFile}
+                  {WriteListToFile Result OutputFile} % Write the solution to stdout.
                end
                unit
             end
+         % Goes to one of the 3 branchs based on the answer.
          [] question(1:Q false:T1 true:T2 'unknown':T3) then
             local Answer in
                Answer = {ProjectLib.askQuestion Q}
