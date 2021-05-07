@@ -112,22 +112,22 @@ in
        * Return the question in record "Record" with minimum abs(true-false).
        * e.g. : Record(Q1:-1 Q2:-2 Q3:2) will return Q1.
        */
-      fun {GetMinQuestion R}
+      fun {GetMinQuestion Record}
          local RecFinder A in
             %function to get the question with minimum abs(value).
-            fun {RecFinder R ArityR MinValue MinQuestion}
+            fun {RecFinder Record ArityR MinValue MinQuestion}
                case ArityR
                of nil then MinQuestion
                [] H|T then
-                  if {Abs R.H} < MinValue then
-                     {RecFinder R T {Abs R.H} H}
+                  if {Abs Record.H} < MinValue then
+                     {RecFinder Record T {Abs Record.H} H}
                   else
-                     {RecFinder R T MinValue MinQuestion}
+                     {RecFinder Record T MinValue MinQuestion}
                   end
                end
             end
-            A = {Arity R}
-            {RecFinder R A {Abs R.(A.1)} A.1}
+            A = {Arity Record}
+            {RecFinder Record A {Abs Record.(A.1)} A.1}
          end
       end
 

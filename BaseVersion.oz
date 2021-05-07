@@ -59,7 +59,7 @@ in
        *
        * Returns a record with the questions as keys and a number (trues - falses) as value.
        */
-      fun {FeedRecord R Database}
+      fun {FeedRecord Record Database}
          local CountTrueFalse in
             fun {CountTrueFalse Character Questions Record}
                case Questions
@@ -75,9 +75,14 @@ in
                end
             end
             case Database
-            of nil then R
+            of nil then Record
             [] H|T then
-               {FeedRecord {CountTrueFalse H {Arity H}.2 R} T}
+               % Call CountTrueFalse with each character
+               if {Width {Arity H}} > 1 then % Check if character has at least one question
+                  {FeedRecord {CountTrueFalse H {Arity H}.2 Record} T}
+               else
+                  {FeedRecord Record T}
+               end
             end
          end
       end
